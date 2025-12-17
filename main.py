@@ -2,6 +2,9 @@ import yaml
 import os
 from pathlib import Path
 
+stats_input = None
+playername_input = None
+
 def read_all_yaml_files(directory="users"):
     all_players = []
     
@@ -18,7 +21,7 @@ def read_all_yaml_files(directory="users"):
                 filename = filepath.name
                 
                 if data:
-                    players = extract_players_from_data(data, filename)
+                    players = extract_players_from_data(data, filename, stats_input)
                     all_players.extend(players)
                     
         except yaml.YAMLError as e:
@@ -28,18 +31,18 @@ def read_all_yaml_files(directory="users"):
     
     return all_players
 
-def extract_players_from_data(data, filename):
+def extract_players_from_data(data, filename, stats):
     players = []
     
     if isinstance(data, list):
         for item in data:
-            player = extract_player_info(item)
-            if player and player['money'] is not None:
+            player = extract_player_info(item, playername_input, stats_input)
+            if player and player[stats] is not None:
                 players.append(player)
     
     elif isinstance(data, dict):
-        player = extract_player_info(data)
-        if player and player['money'] is not None:
+        player = extract_player_info(data, playername_input, stats_input)
+        if player and player[stats] is not None:
             players.append(player)
     
     for player in players:
@@ -47,7 +50,7 @@ def extract_players_from_data(data, filename):
     
     return players
 
-def extract_player_info(item):
+def extract_player_info(item,playername,stats):
     player = {
         'nickname': None,
         'money': None,
@@ -55,18 +58,14 @@ def extract_player_info(item):
     }
     
     nickname = None
-    if 'last-account-name' in item:
-        nickname = str(item['last-account-name']).strip()
-    elif 'nickname' in item:
-        nickname = str(item['nickname']).strip()
-    elif 'name' in item:
-        nickname = str(item['name']).strip()
+    if playername in item:
+        nickname = str(item[playername]).strip()
     
     player['nickname'] = nickname
     
     money = None
-    if 'money' in item:
-        money_value = item['money']
+    if stats in item:
+        money_value = item[stats]
         try:
             if isinstance(money_value, str):
                 money_clean = money_value.replace(' ', '').replace(',', '.')
@@ -79,7 +78,7 @@ def extract_player_info(item):
             print(f"  Внимание: некорректное значение money: {money_value}")
             money = 0.0
     
-    player['money'] = money
+    player[stats] = money
     
     if not player['nickname']:
         return None
@@ -87,7 +86,6 @@ def extract_player_info(item):
     return player
 
 def display_top_10_players(players, output_file="top10_players.txt"):
-    """Отображение топа-10 игроков"""
     if not players:
         print("Нет данных об игроках")
         return []
@@ -102,12 +100,9 @@ def display_top_10_players(players, output_file="top10_players.txt"):
     top_10 = valid_players[:10]
     
     report_lines = [
-        "ТОП-10 ИГРОКОВ ПО БАЛАНСУ",
+        "ТОП-10 ИГРОКОВ ПО СТАТИСТИКЕ",
         "=" * 70,
-        f"Всего игроков: {len(valid_players)}",
-        f"Всего файлов: {len(set(p['source_file'] for p in valid_players))}",
-        "=" * 70,
-        "№  Никнейм                 Баланс       Файл",
+        "№  Никнейм                 Статистика       Файл",
         "-" * 70
     ]
     
@@ -150,7 +145,7 @@ def save_full_data(players, filename="all_players.txt"):
     with open(filename, 'w', encoding='utf-8') as file:
         file.write("ПОЛНЫЙ СПИСОК ИГРОКОВ\n")
         file.write("=" * 80 + "\n")
-        file.write("№  Никнейм                 Баланс       Файл\n")
+        file.write("№  Никнейм                 Статистика       Файл\n")
         file.write("-" * 80 + "\n")
         
         for i, player in enumerate(players, 1):
@@ -162,14 +157,14 @@ if __name__ == "__main__":
     input_directory = input("Введите название папки (по умолчанию 'users'): ") or "users"
     tops10_file = input("Введите название выходного файла (по умолчанию 'top10_players.txt'): ") or "top10_players.txt"
     full_data_file = input("Введите название выходного файла (по умолчанию 'all_players_data.txt'): ") or "all_players_data.txt"
-
+    playername_input = input("Введите название параметра в конфиге,где написан никнейм игрока (по умолчанию 'playername')") or "playername"
+    stats_input = input("Введите название параметра в конфиге,где написана нужная статистика (по умолчанию 'money')") or "money"
     all_players = read_all_yaml_files(input_directory)
     
     if all_players:
         analyze_player_data(all_players)
         top_10 = display_top_10_players(all_players, tops10_file)
         save_full_data(all_players, full_data_file)
+        print(f"Полные данные сохранены в: {full_data_file}")
     else:
         print("Не найдено данных об игроках")
-    
-    print(f"Полные данные сохранены в: {full_data_file}")
